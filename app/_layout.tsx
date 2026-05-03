@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform, StyleSheet } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { Colors } from '../constants/theme';
 
@@ -17,10 +17,8 @@ export default function RootLayout() {
     const inAdminGroup = segments[0] === '(admin)';
 
     if (!session) {
-      // Not signed in → go to login
       if (!inAuthGroup) router.replace('/(auth)/login');
     } else if (profile) {
-      // Signed in → route based on role
       if (profile.role === 'admin' && !inAdminGroup) {
         router.replace('/(admin)/dashboard');
       } else if (profile.role === 'employee' && !inEmployeeGroup) {
@@ -31,13 +29,13 @@ export default function RootLayout() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
+      <View style={styles.loading}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
 
-  return (
+  const stack = (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(employee)" />
@@ -45,4 +43,41 @@ export default function RootLayout() {
       <Stack.Screen name="index" />
     </Stack>
   );
+
+  // On web: center the app in a phone-width container
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webOuter}>
+        <View style={styles.webInner}>
+          {stack}
+        </View>
+      </View>
+    );
+  }
+
+  return stack;
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
+  webOuter: {
+    flex: 1,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  webInner: {
+    width: '100%',
+    maxWidth: 480,
+    flex: 1,
+    backgroundColor: Colors.background,
+    // Subtle shadow so it looks like a phone on desktop
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+  },
+});
