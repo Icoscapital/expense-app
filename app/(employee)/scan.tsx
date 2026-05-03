@@ -155,6 +155,11 @@ function NativeScanScreen() {
       Alert.alert('Error', 'You must be in a workspace to scan receipts.');
       return;
     }
+
+    // Declared outside try so catch can still pass them to the form
+    let uploadedUrl = '';
+    let uploadedPath = '';
+
     try {
       setScanState('capturing');
       setStatusMessage('Capturing…');
@@ -171,6 +176,8 @@ function NativeScanScreen() {
       const { publicUrl, storagePath } = await uploadReceiptBase64(
         photo.base64, profile.workspace_id, profile.id, tempId
       );
+      uploadedUrl = publicUrl;
+      uploadedPath = storagePath;
 
       setScanState('scanning');
       setStatusMessage('Reading receipt…');
@@ -197,15 +204,16 @@ function NativeScanScreen() {
         },
       });
     } catch (err: any) {
-      const msg: string = err?.message ?? '';
-      if (msg.includes('API key is not configured')) {
-        setScanState('error');
-        setStatusMessage('Vision API key not set up yet — enter manually.');
-      } else {
-        setScanState('error');
-        setStatusMessage('Scan failed — opening form to fill in manually.');
-      }
-      setTimeout(() => router.push('/(employee)/expenses/new'), 2000);
+      setScanState('error');
+      setStatusMessage('Could not read receipt — fill in details manually.');
+      // Still pass the receipt image even if OCR failed
+      setTimeout(() => router.push({
+        pathname: '/(employee)/expenses/new',
+        params: {
+          receiptUrl: uploadedUrl,
+          receiptStoragePath: uploadedPath,
+        },
+      }), 2000);
     }
   }
 
@@ -219,6 +227,9 @@ function NativeScanScreen() {
     if (result.canceled || !result.assets[0]?.base64) return;
 
     const base64 = result.assets[0].base64;
+    let uploadedUrl = '';
+    let uploadedPath = '';
+
     try {
       setScanState('uploading');
       setStatusMessage('Uploading receipt…');
@@ -226,6 +237,8 @@ function NativeScanScreen() {
       const { publicUrl, storagePath } = await uploadReceiptBase64(
         base64, profile.workspace_id, profile.id, tempId
       );
+      uploadedUrl = publicUrl;
+      uploadedPath = storagePath;
 
       setScanState('scanning');
       setStatusMessage('Reading receipt…');
@@ -253,8 +266,14 @@ function NativeScanScreen() {
       });
     } catch (err: any) {
       setScanState('error');
-      setStatusMessage('Could not read receipt — opening form.');
-      setTimeout(() => router.push('/(employee)/expenses/new'), 2000);
+      setStatusMessage('Could not read receipt — fill in details manually.');
+      setTimeout(() => router.push({
+        pathname: '/(employee)/expenses/new',
+        params: {
+          receiptUrl: uploadedUrl,
+          receiptStoragePath: uploadedPath,
+        },
+      }), 2000);
     }
   }
 

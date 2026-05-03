@@ -130,6 +130,27 @@ export function useExpenses(options: UseExpensesOptions = {}) {
     await fetchExpenses();
   }
 
+  /** Employee: reset a rejected expense back to draft for editing & resubmission */
+  async function resubmitRejectedExpense(id: string) {
+    const { error } = await supabase.rpc('resubmit_rejected_expense', { p_expense_id: id });
+    if (error) throw new Error(error.message);
+    await fetchExpenses();
+  }
+
+  /** Employee: permanently delete a rejected expense */
+  async function deleteRejectedExpense(id: string) {
+    const { error } = await supabase.rpc('delete_rejected_expense', { p_expense_id: id });
+    if (error) throw new Error(error.message);
+    await fetchExpenses();
+  }
+
+  /** Admin: permanently delete any expense */
+  async function adminDeleteExpense(id: string) {
+    const { error } = await supabase.rpc('admin_delete_expense', { p_expense_id: id });
+    if (error) throw new Error(error.message);
+    await fetchExpenses();
+  }
+
   return {
     expenses,
     loading,
@@ -143,5 +164,8 @@ export function useExpenses(options: UseExpensesOptions = {}) {
     approveExpense,
     rejectExpense,
     recallExpense,
+    resubmitRejectedExpense,
+    deleteRejectedExpense,
+    adminDeleteExpense,
   };
 }

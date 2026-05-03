@@ -39,7 +39,10 @@ export default function ExpenseDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
-  const { expenses, saveDraftExpense, deleteExpense, submitExpense, recallExpense, loading } = useExpenses({
+  const {
+    expenses, saveDraftExpense, deleteExpense, submitExpense,
+    recallExpense, resubmitRejectedExpense, deleteRejectedExpense, loading,
+  } = useExpenses({
     userId: profile?.id,
     workspaceId: profile?.workspace_id ?? undefined,
   });
@@ -84,6 +87,7 @@ export default function ExpenseDetailScreen() {
 
   const isDraft = expense.status === 'draft';
   const isSubmitted = expense.status === 'submitted';
+  const isRejected = expense.status === 'rejected';
 
   async function handleSave() {
     if (!isDraft) return;
@@ -178,6 +182,50 @@ export default function ExpenseDetailScreen() {
       Alert.alert('Error', err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleResubmitRejected() {
+    async function doResubmit() {
+      setSaving(true);
+      try {
+        await resubmitRejectedExpense(expense!.id);
+        // expense status is now 'draft' — UI will re-render with editable fields
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setSaving(false);
+      }
+    }
+    if (Platform.OS === 'web') {
+      if (window.confirm('Reset this expense to Draft so you can edit and resubmit it?')) doResubmit();
+    } else {
+      Alert.alert('Edit & Resubmit?', 'This will reset the expense to Draft so you can correct it.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Edit & Resubmit', onPress: doResubmit },
+      ]);
+    }
+  }
+
+  async function handleDeleteRejected() {
+    async function doDelete() {
+      setSaving(true);
+      try {
+        await deleteRejectedExpense(expense!.id);
+        router.push('/(employee)/expenses');
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setSaving(false);
+      }
+    }
+    if (Platform.OS === 'web') {
+      if (window.confirm('Permanently delete this rejected expense? This cannot be undone.')) doDelete();
+    } else {
+      Alert.alert('Delete expense?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
     }
   }
 
@@ -321,6 +369,18 @@ export default function ExpenseDetailScreen() {
             <Text style={styles.recallBtnText}>↩ Recall & Edit</Text>
           </TouchableOpacity>
         )}
+
+        {/* Rejected — Edit & Resubmit or Delete */}
+        {isRejected && (
+          <View style={[styles.buttonRow, { marginTop: 16 }]}>
+            <TouchableOpacity style={[styles.button, styles.deleteRejectedBtn]} onPress={handleDeleteRejected}>
+              <Text style={styles.deleteRejectedText}>🗑 Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.button, styles.resubmitBtn]} onPress={handleResubmitRejected}>
+              <Text style={styles.resubmitText}>✏️ Edit & Resubmit</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
       </KeyboardAvoidingView>
 
@@ -454,6 +514,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
   },
   recallBtnText: { fontWeight: '700', color: '#92400E', fontSize: FontSize.sm },
+
+  deleteRejectedBtn: {
+    backgroundColor: Colors.dangerLight,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+  },
+  deleteRejectedText: { fontWeight: '700', color: Colors.danger, fontSize: FontSize.sm },
+  resubmitBtn: { backgroundColor: Colors.primary },
+  resubmitText: { fontWeight: '700', color: Colors.white, fontSize: FontSize.sm },
 
   // Modal
   modalOverlay: {

@@ -37,7 +37,7 @@ export default function AdminExpenseDetailScreen() {
   const { profile } = useAuth();
   const {
     expenses, loading,
-    updateExpense, approveExpense, rejectExpense,
+    updateExpense, approveExpense, rejectExpense, adminDeleteExpense,
   } = useExpenses({ workspaceId: profile?.workspace_id ?? undefined });
 
   const expense = expenses.find((e) => e.id === id) ?? null;
@@ -78,6 +78,8 @@ export default function AdminExpenseDetailScreen() {
   }
 
   const isPending = expense.status === 'submitted';
+  // Admin can approve/re-approve from both submitted and rejected states
+  const canApprove = expense.status === 'submitted' || expense.status === 'rejected';
   const employeeName = expense.profiles?.full_name ?? 'Employee';
 
   async function handleDownloadReceipt() {
@@ -121,6 +123,26 @@ export default function AdminExpenseDetailScreen() {
     }
   }
 
+  async function handleSaveAndApprove() {
+    setSaving(true);
+    try {
+      await updateExpense(expense!.id, {
+        amount: parseFloat(amount),
+        currency,
+        category: category!,
+        merchant_name: merchantName.trim() || null,
+        description: description.trim() || null,
+        expense_date: toISODate(expenseDate),
+      });
+      await approveExpense(expense!.id);
+      goBack();
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleApprove() {
     async function doApprove() {
       setSaving(true);
@@ -156,6 +178,28 @@ export default function AdminExpenseDetailScreen() {
       Alert.alert('Error', err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAdminDelete() {
+    async function doDelete() {
+      setSaving(true);
+      try {
+        await adminDeleteExpense(expense!.id);
+        goBack();
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setSaving(false);
+      }
+    }
+    if (Platform.OS === 'web') {
+      if (window.confirm('Permanently delete this expense? This cannot be undone.')) doDelete();
+    } else {
+      Alert.alert('Delete expense?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
     }
   }
 
@@ -267,15 +311,22 @@ export default function AdminExpenseDetailScreen() {
             </View>
           )}
 
-          {/* Save button when editing */}
+          {/* Save / Save & Approve buttons when editing */}
           {editing && (
-            <TouchableOpacity style={[styles.btn, styles.saveBtn, { marginTop: 16 }]} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>Save Changes</Text>
-            </TouchableOpacity>
+            <View style={[styles.actionRow, { marginTop: 16 }]}>
+              <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={handleSave}>
+                <Text style={styles.saveBtnText}>Save Only</Text>
+              </TouchableOpacity>
+              {canApprove && (
+                <TouchableOpacity style={[styles.btn, styles.approveBtn]} onPress={handleSaveAndApprove}>
+                  <Text style={styles.approveBtnText}>Save & Approve</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
 
-          {/* Approve / Reject for submitted expenses */}
-          {isPending && !editing && (
+          {/* Approve / Reject — visible when not editing, for submitted or rejected expenses */}
+          {canApprove && !editing && (
             <View style={{ marginTop: 16 }}>
               {!showRejectInput ? (
                 <View style={styles.actionRow}>
@@ -315,6 +366,16 @@ export default function AdminExpenseDetailScreen() {
                 </View>
               )}
             </View>
+          )}
+
+          {/* Admin delete — available for any non-approved expense */}
+          {expense.status !== 'approved' && !editing && (
+            <TouchableOpacity
+              style={[styles.deleteBtn, { marginTop: 20 }]}
+              onPress={handleAdminDelete}
+            >
+              <Text style={styles.deleteBtnText}>🗑  Delete Expense</Text>
+            </TouchableOpacity>
           )}
 
         </ScrollView>
@@ -390,4 +451,14 @@ const styles = StyleSheet.create({
   approveBtnText: { fontWeight: '700', color: Colors.white, fontSize: FontSize.sm },
   rejectBtn: { backgroundColor: Colors.dangerLight, borderWidth: 1, borderColor: Colors.danger },
   rejectBtnText: { fontWeight: '700', color: Colors.danger, fontSize: FontSize.sm },
+
+  deleteBtn: {
+    paddingVertical: 9,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    backgroundColor: Colors.gray50,
+  },
+  deleteBtnText: { fontWeight: '600', color: Colors.textSecondary, fontSize: FontSize.sm },
 });
