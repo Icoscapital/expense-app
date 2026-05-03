@@ -23,25 +23,34 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
-  // Pre-fill workspace code from URL param or use known workspace code
   const [workspaceCode, setWorkspaceCode] = useState(params.code ?? WORKSPACE_CODE);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  function showError(msg: string) {
+    setErrorMsg(msg);
+    setSuccessMsg('');
+  }
 
   async function handleRegister() {
+    setErrorMsg('');
+    setSuccessMsg('');
+
     if (!fullName.trim() || !email.trim() || !password) {
-      Alert.alert('Missing fields', 'Please fill in all required fields.');
+      showError('Please fill in all required fields.');
       return;
     }
     if (!email.trim().toLowerCase().endsWith(ALLOWED_DOMAIN)) {
-      Alert.alert('Access restricted', `Only ${ALLOWED_DOMAIN} email addresses can register.`);
+      showError(`Only ${ALLOWED_DOMAIN} email addresses can register.`);
       return;
     }
     if (mode === 'create' && (!workspaceName.trim() || !adminEmail.trim())) {
-      Alert.alert('Missing fields', 'Please enter a workspace name and admin email.');
+      showError('Please enter a workspace name and admin email.');
       return;
     }
     if (mode === 'join' && !workspaceCode.trim()) {
-      Alert.alert('Missing fields', 'Please enter your workspace invite code.');
+      showError('Please enter your workspace invite code.');
       return;
     }
 
@@ -64,10 +73,9 @@ export default function RegisterScreen() {
       const userId = authData.user.id;
 
       // Small delay to ensure session is active before DB calls
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 800));
 
       if (mode === 'create') {
-        // Use SECURITY DEFINER function to bypass RLS
         const { data: workspaceId, error: wsError } = await supabase.rpc('create_workspace_and_profile', {
           p_workspace_name: workspaceName.trim(),
           p_admin_email: adminEmail.trim().toLowerCase(),
@@ -75,21 +83,20 @@ export default function RegisterScreen() {
           p_user_id: userId,
         });
         if (wsError) throw wsError;
-
-        Alert.alert('🎉 Workspace created!', `Share this code with your team:\n\n${workspaceId}`, [{ text: 'OK' }]);
+        setSuccessMsg(`🎉 Workspace created! Invite code: ${workspaceId}`);
       } else {
-        const { data: success, error: joinError } = await supabase
-          .rpc('join_workspace', {
-            p_workspace_id: workspaceCode.trim(),
-            p_full_name: fullName.trim(),
-            p_user_id: userId,
-          });
+        const { data: success, error: joinError } = await supabase.rpc('join_workspace', {
+          p_workspace_id: workspaceCode.trim(),
+          p_full_name: fullName.trim(),
+          p_user_id: userId,
+        });
         if (joinError) throw joinError;
         if (!success) throw new Error('Invalid workspace code. Please check with your admin.');
+        setSuccessMsg('✅ Account created! Signing you in…');
       }
     } catch (err: any) {
       setLoading(false);
-      Alert.alert('Registration failed', err.message ?? 'Something went wrong.');
+      showError(err.message ?? 'Something went wrong. Please try again.');
       return;
     }
 
@@ -153,6 +160,17 @@ export default function RegisterScreen() {
                   {workspaceCode === WORKSPACE_CODE ? '✅ Icos Capital workspace' : ''}
                 </Text>
               </>
+            )}
+
+            {!!errorMsg && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+              </View>
+            )}
+            {!!successMsg && (
+              <View style={styles.successBox}>
+                <Text style={styles.successText}>{successMsg}</Text>
+              </View>
             )}
 
             <TouchableOpacity style={styles.button} onPress={handleRegister} activeOpacity={0.85}>
@@ -227,6 +245,18 @@ const styles = StyleSheet.create({
   buttonText: { color: Colors.white, fontSize: FontSize.base, fontWeight: '700' },
 
   codeHint: { fontSize: FontSize.xs, color: Colors.success ?? '#10B981', marginTop: 3 },
+  errorBox: {
+    backgroundColor: '#FEF2F2', borderRadius: BorderRadius.md,
+    borderWidth: 1, borderColor: '#FCA5A5',
+    padding: 8, marginTop: 8,
+  },
+  errorText: { fontSize: FontSize.xs, color: '#B91C1C', fontWeight: '600' },
+  successBox: {
+    backgroundColor: '#F0FDF4', borderRadius: BorderRadius.md,
+    borderWidth: 1, borderColor: '#86EFAC',
+    padding: 8, marginTop: 8,
+  },
+  successText: { fontSize: FontSize.xs, color: '#15803D', fontWeight: '600' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 6 },
   footerText: { color: Colors.textSecondary, fontSize: FontSize.xs },
   link: { color: Colors.primary, fontSize: FontSize.xs, fontWeight: '600' },
