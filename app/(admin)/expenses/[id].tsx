@@ -28,7 +28,12 @@ function toISODate(display: string): string {
 
 export default function AdminExpenseDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, reportId } = useLocalSearchParams<{ id: string; reportId?: string }>();
+
+  function goBack() {
+    if (reportId) router.push(`/(admin)/reports/${reportId}`);
+    else router.back();
+  }
   const { profile } = useAuth();
   const {
     expenses, loading,
@@ -64,7 +69,7 @@ export default function AdminExpenseDetailScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <Text style={styles.notFound}>Expense not found</Text>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={goBack}>
             <Text style={styles.backLink}>← Go back</Text>
           </TouchableOpacity>
         </View>
@@ -100,7 +105,7 @@ export default function AdminExpenseDetailScreen() {
       setSaving(true);
       try {
         await approveExpense(expense!.id);
-        router.back();
+        goBack();
       } catch (err: any) {
         Alert.alert('Error', err.message);
       } finally {
@@ -125,7 +130,7 @@ export default function AdminExpenseDetailScreen() {
     setSaving(true);
     try {
       await rejectExpense(expense!.id, rejectNote.trim());
-      router.back();
+      goBack();
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {
@@ -138,7 +143,7 @@ export default function AdminExpenseDetailScreen() {
       {(saving || loading) && <LoadingOverlay />}
 
       <View style={styles.navHeader}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={goBack}>
           <Text style={styles.backBtn}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.navTitle}>Expense Detail</Text>

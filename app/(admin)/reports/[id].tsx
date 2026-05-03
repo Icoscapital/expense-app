@@ -229,7 +229,7 @@ export default function ReportDetailScreen() {
                   <TouchableOpacity
                     key={e.id}
                     style={styles.expenseRow}
-                    onPress={() => router.push(`/(admin)/expenses/${e.id}`)}
+                    onPress={() => router.push(`/(admin)/expenses/${e.id}?reportId=${report.id}`)}
                     activeOpacity={0.75}
                   >
                     <View style={[styles.expenseIcon, { backgroundColor: (cat?.color ?? '#6366F1') + '22' }]}>
@@ -269,21 +269,33 @@ export default function ReportDetailScreen() {
           );
         })}
 
-        {/* Bottom action buttons (only if pending expenses remain) */}
+        {/* Bulk actions — pending expenses remain */}
         {report.status === 'pending' && pendingExpenses.length > 0 && (
           <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.rejectBtn]}
-              onPress={() => setRejectModalVisible(true)}
-            >
+            <TouchableOpacity style={[styles.actionBtn, styles.rejectBtn]} onPress={() => setRejectModalVisible(true)}>
               <Text style={styles.rejectBtnText}>✕  Reject All</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.approveBtn]}
-              onPress={handleApproveAll}
-            >
+            <TouchableOpacity style={[styles.actionBtn, styles.approveBtn]} onPress={handleApproveAll}>
               <Text style={styles.approveBtnText}>✓  Approve All</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Finalize — all individual expenses reviewed, report still pending */}
+        {report.status === 'pending' && pendingExpenses.length === 0 && expenses.length > 0 && (
+          <View style={styles.finalizeBox}>
+            <Text style={styles.finalizeTitle}>All expenses reviewed</Text>
+            <Text style={styles.finalizeSub}>
+              {expenses.filter(e => e.status === 'approved').length} approved · {expenses.filter(e => e.status === 'rejected').length} rejected
+            </Text>
+            <View style={styles.actions}>
+              <TouchableOpacity style={[styles.actionBtn, styles.rejectBtn]} onPress={() => setRejectModalVisible(true)}>
+                <Text style={styles.rejectBtnText}>✕  Reject Report</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, styles.approveBtn]} onPress={handleApproveAll}>
+                <Text style={styles.approveBtnText}>✓  Finalise Report</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -463,6 +475,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   approveOneBtnText: { fontSize: 11, color: Colors.white, fontWeight: '700' },
+
+  finalizeBox: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.md,
+    padding: 12,
+    marginTop: 12,
+  },
+  finalizeTitle: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary, marginBottom: 2 },
+  finalizeSub: { fontSize: FontSize.xs, color: Colors.primary, marginBottom: 10 },
 
   actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   actionBtn: { flex: 1, paddingVertical: 9, borderRadius: BorderRadius.md, alignItems: 'center' },
