@@ -7,20 +7,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../../hooks/useAuth';
 import { useReports } from '../../../hooks/useReports';
-import { ExpenseCard } from '../../../components/ExpenseCard';
+import { useExpenses } from '../../../hooks/useExpenses';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { LoadingOverlay } from '../../../components/LoadingOverlay';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '../../../constants/theme';
+import { CATEGORIES } from '../../../constants/categories';
+import { Expense } from '../../../types';
 
 export default function ReportDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
   const { reports, approveReport, rejectReport } = useReports(profile?.workspace_id ?? undefined);
+  const { approveExpense, rejectExpense } = useExpenses({ workspaceId: profile?.workspace_id ?? undefined });
 
   const [loading, setLoading] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
+  // Per-expense reject modal
+  const [rejectExpenseId, setRejectExpenseId] = useState<string | null>(null);
+  const [rejectExpenseNote, setRejectExpenseNote] = useState('');
 
   const report = reports.find((r) => r.id === id) ?? null;
 
@@ -46,7 +52,10 @@ export default function ReportDetailScreen() {
     return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
   };
 
-  async function handleApprove() {
+  // Count pending (submitted) expenses
+  const pendingExpenses = expenses.filter((e) => e.status === 'submitted');
+
+  async function handleApproveAll() {
     async function doApprove() {
       setLoading(true);
       try {
@@ -60,17 +69,56 @@ export default function ReportDetailScreen() {
       }
     }
 
+    const msg = `Approve all ${pendingExpenses.length} remaining expense${pendingExpenses.length !== 1 ? 's' : ''}?`;
     if (Platform.OS === 'web') {
-      if (window.confirm(`Approve report? This will approve all ${expenses.length} expenses.`)) doApprove();
+      if (window.confirm(msg)) doApprove();
     } else {
-      Alert.alert('Approve report?', `This will approve all ${expenses.length} expenses.`, [
+      Alert.alert('Approve All?', msg, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Approve', onPress: doApprove },
       ]);
     }
   }
 
-  async function handleReject() {
+  async function handleApproveOne(expense: Expense) {
+    async function doApprove() {
+      setLoading(true);
+      try {
+        await approveExpense(expense.id);
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Approve "${expense.merchant_name || expense.category}"?`)) doApprove();
+    } else {
+      Alert.alert('Approve?', `Approve "${expense.merchant_name || expense.category}"?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Approve', onPress: doApprove },
+      ]);
+    }
+  }
+
+  async function handleRejectOne() {
+    if (!rejectExpenseNote.trim()) {
+      Alert.alert('Note required', 'Please add a reason.');
+      return;
+    }
+    setRejectExpenseId(null);
+    setLoading(true);
+    try {
+      await rejectExpense(rejectExpenseId!, rejectExpenseNote.trim());
+      setRejectExpenseNote('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRejectReport() {
     if (!rejectNote.trim()) {
       Alert.alert('Note required', 'Please add a note explaining why this report is rejected.');
       return;
@@ -106,15 +154,15 @@ export default function ReportDetailScreen() {
           <Text style={styles.backBtn}>← Reports</Text>
         </TouchableOpacity>
         <Text style={styles.navTitle}>Report Detail</Text>
-        <View style={{ width: 80 }} />
+        <View style={{ width: 70 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Summary */}
+        {/* Summary — compact */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryPeriod}>{toDisplayDate(report.week_start)} – {toDisplayDate(report.week_end)}</Text>
-            <StatusBadge status={report.status} />
+            <StatusBadge status={report.status} size="sm" />
           </View>
           <Text style={styles.summaryTotal}>{fmt(report.total_amount ?? 0)}</Text>
           <Text style={styles.summaryCount}>
@@ -127,6 +175,7 @@ export default function ReportDetailScreen() {
           const empTotal = emExpenses.reduce((s, e) => s + Number(e.amount), 0);
           return (
             <View key={employee} style={styles.section}>
+              {/* Employee row */}
               <View style={styles.employeeHeader}>
                 <View style={styles.employeeAvatar}>
                   <Text style={styles.employeeInitial}>{employee[0]}</Text>
@@ -136,25 +185,62 @@ export default function ReportDetailScreen() {
                   <Text style={styles.employeeTotal}>{fmt(empTotal)}</Text>
                 </View>
               </View>
-              {emExpenses.map((e) => (
-                <ExpenseCard key={e.id} expense={e} showEmployee={false} />
-              ))}
+
+              {/* Expense rows with per-item approve/reject */}
+              {emExpenses.map((e) => {
+                const cat = CATEGORIES[e.category];
+                const isPending = e.status === 'submitted';
+                return (
+                  <View key={e.id} style={styles.expenseRow}>
+                    <View style={[styles.expenseIcon, { backgroundColor: (cat?.color ?? '#6366F1') + '22' }]}>
+                      <Text style={styles.expenseIconText}>{cat?.icon ?? '📋'}</Text>
+                    </View>
+                    <View style={styles.expenseInfo}>
+                      <Text style={styles.expenseMerchant} numberOfLines={1}>
+                        {e.merchant_name || cat?.label || 'Expense'}
+                      </Text>
+                      <Text style={styles.expenseDate}>{toDisplayDate(e.expense_date)}</Text>
+                    </View>
+                    <View style={styles.expenseRight}>
+                      <Text style={styles.expenseAmount}>{fmt(Number(e.amount))}</Text>
+                      {isPending && report.status === 'pending' ? (
+                        <View style={styles.expenseActions}>
+                          <TouchableOpacity
+                            style={styles.rejectOneBtn}
+                            onPress={() => { setRejectExpenseId(e.id); setRejectExpenseNote(''); }}
+                          >
+                            <Text style={styles.rejectOneBtnText}>✕</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.approveOneBtn}
+                            onPress={() => handleApproveOne(e)}
+                          >
+                            <Text style={styles.approveOneBtnText}>✓</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <StatusBadge status={e.status} size="sm" />
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           );
         })}
 
-        {/* Action Buttons (only for pending reports) */}
-        {report.status === 'pending' && (
+        {/* Bottom action buttons (only if pending expenses remain) */}
+        {report.status === 'pending' && pendingExpenses.length > 0 && (
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.actionBtn, styles.rejectBtn]}
               onPress={() => setRejectModalVisible(true)}
             >
-              <Text style={styles.rejectBtnText}>✕  Reject</Text>
+              <Text style={styles.rejectBtnText}>✕  Reject All</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, styles.approveBtn]}
-              onPress={handleApprove}
+              onPress={handleApproveAll}
             >
               <Text style={styles.approveBtnText}>✓  Approve All</Text>
             </TouchableOpacity>
@@ -162,7 +248,7 @@ export default function ReportDetailScreen() {
         )}
       </ScrollView>
 
-      {/* Reject Modal */}
+      {/* Reject whole report modal */}
       <Modal
         visible={rejectModalVisible}
         animationType="slide"
@@ -185,14 +271,50 @@ export default function ReportDetailScreen() {
               placeholder="Explain what needs to be corrected…"
               placeholderTextColor={Colors.textMuted}
               multiline
-              numberOfLines={5}
+              numberOfLines={4}
               autoFocus
             />
             <TouchableOpacity
-              style={[styles.actionBtn, styles.rejectBtn, { marginTop: Spacing.lg }]}
-              onPress={handleReject}
+              style={[styles.actionBtn, styles.rejectBtn, { marginTop: Spacing.md }]}
+              onPress={handleRejectReport}
             >
               <Text style={styles.rejectBtnText}>Send Rejection</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Reject single expense modal */}
+      <Modal
+        visible={!!rejectExpenseId}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setRejectExpenseId(null)}
+      >
+        <SafeAreaView style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Reject Expense</Text>
+            <TouchableOpacity onPress={() => setRejectExpenseId(null)}>
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalBody}>
+            <Text style={styles.modalLabel}>Reason *</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={rejectExpenseNote}
+              onChangeText={setRejectExpenseNote}
+              placeholder="Why is this expense rejected?"
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              numberOfLines={4}
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.rejectBtn, { marginTop: Spacing.md }]}
+              onPress={handleRejectOne}
+            >
+              <Text style={styles.rejectBtnText}>Reject Expense</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -204,60 +326,108 @@ export default function ReportDetailScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  notFound: { fontSize: FontSize.md, color: Colors.textSecondary },
-  backLink: { color: Colors.primary, marginTop: Spacing.md, fontSize: FontSize.base },
+  notFound: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  backLink: { color: Colors.primary, marginTop: Spacing.md, fontSize: FontSize.sm },
 
   navHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  backBtn: { fontSize: FontSize.base, color: Colors.primary, fontWeight: '600' },
-  navTitle: { fontSize: FontSize.md, fontWeight: '700', color: Colors.text },
+  backBtn: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
+  navTitle: { fontSize: FontSize.base, fontWeight: '700', color: Colors.text },
 
-  container: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+  container: { padding: 10, paddingBottom: 40 },
 
   summaryCard: {
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    padding: 12,
+    marginBottom: 10,
   },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  summaryPeriod: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.8)', flex: 1 },
-  summaryTotal: { fontSize: FontSize.xxxl, fontWeight: '800', color: Colors.white },
-  summaryCount: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  summaryPeriod: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)', flex: 1 },
+  summaryTotal: { fontSize: FontSize.xxl, fontWeight: '800', color: Colors.white },
+  summaryCount: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
 
-  section: { marginBottom: Spacing.lg },
+  section: { marginBottom: 10 },
   employeeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 4,
+    paddingHorizontal: 2,
   },
   employeeAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.sm,
+    marginRight: 8,
   },
-  employeeInitial: { color: Colors.white, fontWeight: '700', fontSize: FontSize.md },
+  employeeInitial: { color: Colors.white, fontWeight: '700', fontSize: FontSize.xs },
   employeeInfo: { flex: 1 },
-  employeeName: { fontSize: FontSize.base, fontWeight: '700', color: Colors.text },
-  employeeTotal: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  employeeName: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.text },
+  employeeTotal: { fontSize: FontSize.xs, color: Colors.textSecondary },
 
-  actions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg },
-  actionBtn: { flex: 1, padding: Spacing.md, borderRadius: BorderRadius.md, alignItems: 'center' },
+  // Compact expense row
+  expenseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    padding: 8,
+    marginBottom: 5,
+    ...Shadow.sm,
+  },
+  expenseIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: BorderRadius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  expenseIconText: { fontSize: 16 },
+  expenseInfo: { flex: 1, marginRight: 6 },
+  expenseMerchant: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.text },
+  expenseDate: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
+  expenseRight: { alignItems: 'flex-end', gap: 3 },
+  expenseAmount: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.text },
+  expenseActions: { flexDirection: 'row', gap: 4, marginTop: 2 },
+  rejectOneBtn: {
+    width: 28,
+    height: 22,
+    borderRadius: 4,
+    backgroundColor: Colors.dangerLight,
+    borderWidth: 1,
+    borderColor: Colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rejectOneBtnText: { fontSize: 11, color: Colors.danger, fontWeight: '700' },
+  approveOneBtn: {
+    width: 28,
+    height: 22,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approveOneBtnText: { fontSize: 11, color: Colors.white, fontWeight: '700' },
+
+  actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  actionBtn: { flex: 1, paddingVertical: 9, borderRadius: BorderRadius.md, alignItems: 'center' },
   rejectBtn: { backgroundColor: Colors.dangerLight, borderWidth: 1, borderColor: Colors.danger },
-  rejectBtnText: { color: Colors.danger, fontWeight: '700', fontSize: FontSize.base },
+  rejectBtnText: { color: Colors.danger, fontWeight: '700', fontSize: FontSize.sm },
   approveBtn: { backgroundColor: Colors.primary },
-  approveBtnText: { color: Colors.white, fontWeight: '700', fontSize: FontSize.base },
+  approveBtnText: { color: Colors.white, fontWeight: '700', fontSize: FontSize.sm },
 
   // Modal
   modal: { flex: 1, backgroundColor: Colors.background },
@@ -270,19 +440,19 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     backgroundColor: Colors.white,
   },
-  modalTitle: { fontSize: FontSize.md, fontWeight: '700', color: Colors.text },
-  modalClose: { fontSize: FontSize.lg, color: Colors.textSecondary },
+  modalTitle: { fontSize: FontSize.base, fontWeight: '700', color: Colors.text },
+  modalClose: { fontSize: FontSize.md, color: Colors.textSecondary },
   modalBody: { padding: Spacing.md },
-  modalLabel: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.gray700, marginBottom: Spacing.sm },
+  modalLabel: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.gray700, marginBottom: 6 },
   modalInput: {
     backgroundColor: Colors.gray50,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    fontSize: FontSize.base,
+    padding: Spacing.sm,
+    fontSize: FontSize.sm,
     color: Colors.text,
-    minHeight: 120,
+    minHeight: 100,
     textAlignVertical: 'top',
   },
 });
