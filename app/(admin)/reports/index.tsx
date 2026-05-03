@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
-  TouchableOpacity, RefreshControl, Alert,
+  TouchableOpacity, RefreshControl, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -37,27 +37,28 @@ export default function AdminReportsScreen() {
 
   async function handleGenerateReport() {
     if (!profile?.workspace_id) return;
-    Alert.alert(
-      'Generate Report?',
-      `This will bundle ${unlinkedCount} submitted expense${unlinkedCount !== 1 ? 's' : ''} into a report for Marieke to review.`,
-      [
+
+    async function doGenerate() {
+      setGenerating(true);
+      try {
+        await createManualReport(profile!.workspace_id!);
+        Alert.alert('✅ Report created', 'The report is ready for review.');
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setGenerating(false);
+      }
+    }
+
+    const msg = `Bundle ${unlinkedCount} submitted expense${unlinkedCount !== 1 ? 's' : ''} into a report for review?`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) doGenerate();
+    } else {
+      Alert.alert('Generate Report?', msg, [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Generate',
-          onPress: async () => {
-            setGenerating(true);
-            try {
-              await createManualReport(profile.workspace_id!);
-              Alert.alert('✅ Report created', 'The report is ready for review.');
-            } catch (err: any) {
-              Alert.alert('Error', err.message);
-            } finally {
-              setGenerating(false);
-            }
-          },
-        },
-      ]
-    );
+        { text: 'Generate', onPress: doGenerate },
+      ]);
+    }
   }
 
   function renderReport({ item: report }: { item: Report }) {
