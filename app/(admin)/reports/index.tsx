@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
   TouchableOpacity, RefreshControl, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../../hooks/useAuth';
 import { useReports } from '../../../hooks/useReports';
 import { useExpenses } from '../../../hooks/useExpenses';
@@ -29,6 +29,8 @@ export default function AdminReportsScreen() {
   const { reports, loading, refetch, createManualReport } = useReports(profile?.workspace_id ?? undefined);
   const { expenses } = useExpenses({ workspaceId: profile?.workspace_id ?? undefined });
   const [generating, setGenerating] = useState(false);
+
+  useFocusEffect(useCallback(() => { refetch(); }, []));
 
   async function handleSignOut() {
     if (Platform.OS === 'web') {

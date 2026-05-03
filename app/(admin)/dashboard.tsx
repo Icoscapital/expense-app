@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useExpenses } from '../../hooks/useExpenses';
 import { useReports } from '../../hooks/useReports';
@@ -32,6 +32,9 @@ export default function AdminDashboard() {
 
   const loading = expLoading || repLoading;
   function refetch() { refetchExp(); refetchRep(); }
+
+  // Refresh stats every time this screen comes into focus
+  useFocusEffect(useCallback(() => { refetch(); }, []));
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
