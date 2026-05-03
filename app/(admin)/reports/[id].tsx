@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, Alert, TextInput, Modal,
+  TouchableOpacity, Alert, TextInput, Modal, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -47,24 +47,27 @@ export default function ReportDetailScreen() {
   };
 
   async function handleApprove() {
-    Alert.alert('Approve report?', `This will approve all ${expenses.length} expenses.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Approve',
-        onPress: async () => {
-          setLoading(true);
-          try {
-            await approveReport(report!.id, profile!.id);
-            Alert.alert('✅ Approved', 'All expenses have been approved.');
-            router.back();
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-          } finally {
-            setLoading(false);
-          }
-        },
-      },
-    ]);
+    async function doApprove() {
+      setLoading(true);
+      try {
+        await approveReport(report!.id, profile!.id);
+        Alert.alert('✅ Approved', 'All expenses have been approved.');
+        router.back();
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Approve report? This will approve all ${expenses.length} expenses.`)) doApprove();
+    } else {
+      Alert.alert('Approve report?', `This will approve all ${expenses.length} expenses.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Approve', onPress: doApprove },
+      ]);
+    }
   }
 
   async function handleReject() {
