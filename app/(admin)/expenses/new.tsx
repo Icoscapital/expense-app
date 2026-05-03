@@ -132,10 +132,15 @@ export default function AdminNewExpenseScreen() {
         p_receipt_storage_path: receiptStoragePath,
       });
       if (error) throw new Error(error.message);
-      Alert.alert('Done', `Expense added for ${selectedMember.full_name}.`, [
-        { text: 'Add another', onPress: () => resetForm() },
-        { text: 'Done', onPress: () => router.back() },
-      ]);
+      if (Platform.OS === 'web') {
+        const addAnother = window.confirm(`Expense added for ${selectedMember.full_name}.\n\nAdd another expense?`);
+        if (addAnother) resetForm(); else router.back();
+      } else {
+        Alert.alert('Done', `Expense added for ${selectedMember.full_name}.`, [
+          { text: 'Add another', onPress: () => resetForm() },
+          { text: 'Done', onPress: () => router.back() },
+        ]);
+      }
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {

@@ -41,9 +41,14 @@ export default function ResetPasswordScreen() {
     if (error) {
       Alert.alert('Error', error.message);
     } else {
-      Alert.alert('Password updated', 'You can now sign in with your new password.', [
-        { text: 'OK', onPress: () => router.replace('/(auth)/login') },
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert('Password updated! You can now sign in with your new password.');
+        router.replace('/(auth)/login');
+      } else {
+        Alert.alert('Password updated', 'You can now sign in with your new password.', [
+          { text: 'OK', onPress: () => router.replace('/(auth)/login') },
+        ]);
+      }
     }
   }
 
