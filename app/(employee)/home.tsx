@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, RefreshControl, Alert,
+  TouchableOpacity, RefreshControl, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useExpenses } from '../../hooks/useExpenses';
 import { useReports } from '../../hooks/useReports';
@@ -18,11 +18,16 @@ export default function HomeScreen() {
   const { profile, signOut } = useAuth();
 
   async function handleLogout() {
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => signOut() },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to log out?')) signOut();
+    } else {
+      Alert.alert('Log out', 'Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log out', style: 'destructive', onPress: () => signOut() },
+      ]);
+    }
   }
+
   const { expenses, loading, refetch } = useExpenses({
     userId: profile?.id,
     workspaceId: profile?.workspace_id ?? undefined,
@@ -38,6 +43,9 @@ export default function HomeScreen() {
   const submittedCount = expenses.filter((e) => e.status === 'submitted').length;
 
   // Latest report for this user's workspace
+  // Refetch every time screen comes into focus (fixes stale data after recall/submit)
+  useFocusEffect(useCallback(() => { refetch(); }, []));
+
   const latestReport = reports[0] ?? null;
   const recentExpenses = expenses.slice(0, 3);
 

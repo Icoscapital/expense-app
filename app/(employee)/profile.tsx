@@ -1,25 +1,24 @@
 import React from 'react';
 import {
   View, Text, StyleSheet,
-  TouchableOpacity, Alert, ScrollView,
+  TouchableOpacity, Alert, ScrollView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '../../constants/theme';
 
 export default function ProfileScreen() {
-  const { profile, session } = useAuth();
+  const { profile, session, signOut } = useAuth();
 
   async function handleLogout() {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: () => supabase.auth.signOut(),
-      },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to sign out?')) signOut();
+    } else {
+      Alert.alert('Sign out', 'Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+      ]);
+    }
   }
 
   const initials = profile?.full_name

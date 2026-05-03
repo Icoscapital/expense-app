@@ -135,8 +135,9 @@ const styles = StyleSheet.create({
   },
   filterTab: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
+    height: 32,
+    justifyContent: 'center',
+    borderRadius: 16,
     backgroundColor: Colors.gray100,
   },
   filterTabActive: { backgroundColor: Colors.primary },
