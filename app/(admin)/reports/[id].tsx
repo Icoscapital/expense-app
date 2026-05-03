@@ -140,6 +140,35 @@ export default function ReportDetailScreen() {
     }
   }
 
+  function handleDownloadCSV() {
+    if (Platform.OS !== 'web') {
+      Alert.alert('Web only', 'CSV download is available on the web version.');
+      return;
+    }
+    const rows = [
+      ['Employee', 'Date', 'Merchant', 'Category', 'Amount', 'Currency', 'Description', 'Status', 'Rejection Note'],
+      ...expenses.map((e) => [
+        e.profiles?.full_name ?? '',
+        e.expense_date,
+        e.merchant_name ?? '',
+        e.category,
+        String(e.amount),
+        e.currency ?? 'EUR',
+        e.description ?? '',
+        e.status,
+        e.rejection_note ?? '',
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `expenses-${report!.week_start}-to-${report!.week_end}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // Group expenses by employee
   const byEmployee: Record<string, typeof expenses> = {};
   expenses.forEach((e) => {
@@ -158,7 +187,9 @@ export default function ReportDetailScreen() {
           <Text style={styles.backBtn}>← Reports</Text>
         </TouchableOpacity>
         <Text style={styles.navTitle}>Report Detail</Text>
-        <View style={{ width: 70 }} />
+        <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadCSV}>
+          <Text style={styles.downloadBtnText}>⬇ CSV</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
@@ -345,6 +376,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
   navTitle: { fontSize: FontSize.base, fontWeight: '700', color: Colors.text },
+  downloadBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  downloadBtnText: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.primary },
 
   container: { padding: 10, paddingBottom: 40 },
 
