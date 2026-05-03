@@ -18,7 +18,7 @@ export default function ReportDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
-  const { reports, approveReport, rejectReport } = useReports(profile?.workspace_id ?? undefined);
+  const { reports, approveReport, rejectReport, refetch: refetchReports } = useReports(profile?.workspace_id ?? undefined);
   const { approveExpense, rejectExpense } = useExpenses({ workspaceId: profile?.workspace_id ?? undefined });
 
   const [loading, setLoading] = useState(false);
@@ -85,6 +85,7 @@ export default function ReportDetailScreen() {
       setLoading(true);
       try {
         await approveExpense(expense.id);
+        await refetchReports();
       } catch (err: any) {
         Alert.alert('Error', err.message);
       } finally {
@@ -106,11 +107,14 @@ export default function ReportDetailScreen() {
       Alert.alert('Note required', 'Please add a reason.');
       return;
     }
+    const expenseId = rejectExpenseId!;
+    const note = rejectExpenseNote.trim();
     setRejectExpenseId(null);
+    setRejectExpenseNote('');
     setLoading(true);
     try {
-      await rejectExpense(rejectExpenseId!, rejectExpenseNote.trim());
-      setRejectExpenseNote('');
+      await rejectExpense(expenseId, note);
+      await refetchReports();
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {
