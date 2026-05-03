@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet,
   TouchableOpacity, ScrollView, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../../hooks/useAuth';
 import { useExpenses } from '../../../hooks/useExpenses';
 import { ExpenseCard } from '../../../components/ExpenseCard';
@@ -30,6 +30,9 @@ export default function ExpenseListScreen() {
     workspaceId: profile?.workspace_id ?? undefined,
   });
   const [filter, setFilter] = useState<FilterTab>('all');
+
+  // Refresh whenever this screen comes into focus (e.g. after recall/submit on detail screen)
+  useFocusEffect(useCallback(() => { refetch(); }, []));
 
   const filtered = filter === 'all'
     ? expenses
