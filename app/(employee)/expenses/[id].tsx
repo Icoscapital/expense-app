@@ -3,6 +3,12 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, Image, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
+
+// Web-safe confirm helper
+function webConfirm(message: string): boolean {
+  if (Platform.OS === 'web') return window.confirm(message);
+  return false;
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../../hooks/useAuth';
@@ -101,54 +107,60 @@ export default function ExpenseDetailScreen() {
 
   async function handleSubmit() {
     if (!isDraft) return;
-    Alert.alert('Submit expense?', 'Any unsaved changes will be saved automatically.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Submit',
-        onPress: async () => {
-          setSaving(true);
-          try {
-            // Always save current form state before submitting
-            await saveDraftExpense(expense!.id, {
-              amount: parseFloat(amount),
-              currency,
-              category: category!,
-              merchant_name: merchantName.trim() || null,
-              description: description.trim() || null,
-              expense_date: toISODate(expenseDate),
-            });
-            await submitExpense(expense!.id);
-            router.push('/(employee)/expenses');
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-          } finally {
-            setSaving(false);
-          }
-        },
-      },
-    ]);
+
+    async function doSubmit() {
+      setSaving(true);
+      try {
+        await saveDraftExpense(expense!.id, {
+          amount: parseFloat(amount),
+          currency,
+          category: category!,
+          merchant_name: merchantName.trim() || null,
+          description: description.trim() || null,
+          expense_date: toISODate(expenseDate),
+        });
+        await submitExpense(expense!.id);
+        router.push('/(employee)/expenses');
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Submit expense? Any unsaved changes will be saved automatically.')) doSubmit();
+    } else {
+      Alert.alert('Submit expense?', 'Any unsaved changes will be saved automatically.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Submit', onPress: doSubmit },
+      ]);
+    }
   }
 
   async function handleDelete() {
     if (!isDraft) return;
-    Alert.alert('Delete expense?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setSaving(true);
-          try {
-            await deleteExpense(expense!.id);
-            router.push('/(employee)/expenses');
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
-          } finally {
-            setSaving(false);
-          }
-        },
-      },
-    ]);
+
+    async function doDelete() {
+      setSaving(true);
+      try {
+        await deleteExpense(expense!.id);
+        router.push('/(employee)/expenses');
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete expense? This cannot be undone.')) doDelete();
+    } else {
+      Alert.alert('Delete expense?', 'This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
   }
 
   async function handleRecall() {
