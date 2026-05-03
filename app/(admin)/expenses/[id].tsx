@@ -80,6 +80,27 @@ export default function AdminExpenseDetailScreen() {
   const isPending = expense.status === 'submitted';
   const employeeName = expense.profiles?.full_name ?? 'Employee';
 
+  async function handleDownloadReceipt() {
+    if (!expense?.receipt_url) return;
+    if (Platform.OS !== 'web') {
+      Alert.alert('Web only', 'Open on the web app to download receipts.');
+      return;
+    }
+    try {
+      const response = await fetch(expense.receipt_url);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ext = blob.type.includes('png') ? 'png' : 'jpg';
+      a.download = `receipt-${expense.merchant_name || expense.id}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(expense.receipt_url, '_blank');
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -185,6 +206,9 @@ export default function AdminExpenseDetailScreen() {
           {expense.receipt_url && (
             <View style={styles.receiptContainer}>
               <Image source={{ uri: expense.receipt_url }} style={styles.receiptImage} resizeMode="contain" />
+              <TouchableOpacity style={styles.receiptDownloadBtn} onPress={handleDownloadReceipt}>
+                <Text style={styles.receiptDownloadText}>⬇ Download Receipt</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -342,6 +366,11 @@ const styles = StyleSheet.create({
     marginBottom: 10, backgroundColor: Colors.gray100, ...Shadow.sm,
   },
   receiptImage: { width: '100%', height: 200 },
+  receiptDownloadBtn: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingVertical: 7, alignItems: 'center',
+  },
+  receiptDownloadText: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.white },
 
   label: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.gray700, marginBottom: 3 },
   input: {

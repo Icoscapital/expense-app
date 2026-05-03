@@ -140,6 +140,36 @@ export default function ReportDetailScreen() {
     }
   }
 
+  async function handleDownloadAllReceipts() {
+    if (Platform.OS !== 'web') {
+      Alert.alert('Web only', 'Open on the web app to download receipts.');
+      return;
+    }
+    const withReceipts = expenses.filter((e) => e.receipt_url);
+    if (withReceipts.length === 0) {
+      window.alert('No receipts attached to this report.');
+      return;
+    }
+    for (let i = 0; i < withReceipts.length; i++) {
+      const e = withReceipts[i];
+      try {
+        const response = await fetch(e.receipt_url!);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const ext = blob.type.includes('png') ? 'png' : 'jpg';
+        a.download = `receipt-${e.profiles?.full_name ?? 'employee'}-${e.merchant_name || e.id}.${ext}`;
+        a.click();
+        URL.revokeObjectURL(url);
+        // Small delay to avoid browser blocking multiple downloads
+        await new Promise((r) => setTimeout(r, 600));
+      } catch {
+        window.open(e.receipt_url!, '_blank');
+      }
+    }
+  }
+
   function handleDownloadCSV() {
     if (Platform.OS !== 'web') {
       Alert.alert('Web only', 'CSV download is available on the web version.');
@@ -187,9 +217,14 @@ export default function ReportDetailScreen() {
           <Text style={styles.backBtn}>← Reports</Text>
         </TouchableOpacity>
         <Text style={styles.navTitle}>Report Detail</Text>
-        <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadCSV}>
-          <Text style={styles.downloadBtnText}>⬇ CSV</Text>
-        </TouchableOpacity>
+        <View style={styles.navActions}>
+          <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadAllReceipts}>
+            <Text style={styles.downloadBtnText}>🖼 Receipts</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadCSV}>
+            <Text style={styles.downloadBtnText}>⬇ CSV</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.container}>
@@ -393,7 +428,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
   navTitle: { fontSize: FontSize.base, fontWeight: '700', color: Colors.text },
-  downloadBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  navActions: { flexDirection: 'row', gap: 6 },
+  downloadBtn: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   downloadBtnText: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.primary },
 
   container: { padding: 10, paddingBottom: 40 },
