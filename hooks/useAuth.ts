@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
@@ -51,6 +52,9 @@ export function useAuth(): AuthState {
 
   async function signOut() {
     await supabase.auth.signOut();
+    if (Platform.OS === 'web') {
+      window.location.href = '/';
+    }
   }
 
   return { session, profile, loading, signOut };
