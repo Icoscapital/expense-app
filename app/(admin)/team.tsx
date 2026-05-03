@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity,
+  View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -13,7 +13,18 @@ import { EmptyState } from '../../components/EmptyState';
 
 export default function TeamScreen() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
+
+  async function handleSignOut() {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Sign out?')) signOut();
+    } else {
+      Alert.alert('Sign out', 'Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+      ]);
+    }
+  }
   const { expenses, loading: expLoading, refetch } = useExpenses({
     workspaceId: profile?.workspace_id ?? undefined,
   });
@@ -49,12 +60,17 @@ export default function TeamScreen() {
           <Text style={styles.title}>Team</Text>
           <Text style={styles.count}>{members.length} member{members.length !== 1 ? 's' : ''}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.addExpenseBtn}
-          onPress={() => router.push('/(admin)/expenses/new')}
-        >
-          <Text style={styles.addExpenseBtnText}>+ Add Expense</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.addExpenseBtn}
+            onPress={() => router.push('/(admin)/expenses/new')}
+          >
+            <Text style={styles.addExpenseBtnText}>+ Add Expense</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -112,20 +128,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  title: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.text },
-  count: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  title: { fontSize: FontSize.md, fontWeight: '800', color: Colors.text },
+  count: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   addExpenseBtn: {
     backgroundColor: Colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: BorderRadius.md,
   },
-  addExpenseBtnText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: '700' },
+  addExpenseBtnText: { color: Colors.white, fontSize: FontSize.xs, fontWeight: '700' },
+  signOutBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border },
+  signOutText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecondary },
 
   list: { padding: Spacing.md, paddingBottom: Spacing.xxl },
   memberCard: {

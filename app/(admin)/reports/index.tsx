@@ -25,10 +25,21 @@ const fmt = (n: number | null) =>
 
 export default function AdminReportsScreen() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const { reports, loading, refetch, createManualReport } = useReports(profile?.workspace_id ?? undefined);
   const { expenses } = useExpenses({ workspaceId: profile?.workspace_id ?? undefined });
   const [generating, setGenerating] = useState(false);
+
+  async function handleSignOut() {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Sign out?')) signOut();
+    } else {
+      Alert.alert('Sign out', 'Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+      ]);
+    }
+  }
 
   // Submitted expenses not yet in any report
   const unlinkedCount = expenses.filter(
@@ -96,13 +107,18 @@ export default function AdminReportsScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>Weekly Reports</Text>
-        {reports.filter((r) => r.status === 'pending').length > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {reports.filter((r) => r.status === 'pending').length} pending
-            </Text>
-          </View>
-        )}
+        <View style={styles.headerRight}>
+          {reports.filter((r) => r.status === 'pending').length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {reports.filter((r) => r.status === 'pending').length} pending
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Generate report from submitted expenses */}
@@ -149,19 +165,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  title: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.text },
+  title: { fontSize: FontSize.md, fontWeight: '800', color: Colors.text },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   badge: {
     backgroundColor: Colors.warningLight,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: BorderRadius.full,
   },
   badgeText: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.warning },
+  signOutBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border },
+  signOutText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecondary },
 
   generateBanner: {
     flexDirection: 'row',

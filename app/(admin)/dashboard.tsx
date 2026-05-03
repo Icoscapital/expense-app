@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,7 +11,18 @@ import { Colors, FontSize, BorderRadius, Shadow } from '../../constants/theme';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
+
+  async function handleSignOut() {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Sign out?')) signOut();
+    } else {
+      Alert.alert('Sign out', 'Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+      ]);
+    }
+  }
   const { expenses, loading: expLoading, refetch: refetchExp } = useExpenses({
     workspaceId: profile?.workspace_id ?? undefined,
   });
@@ -45,8 +56,15 @@ export default function AdminDashboard() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Text style={styles.greeting}>Hello, {profile?.full_name?.split(' ')[0] ?? 'Admin'} 👋</Text>
-        <Text style={styles.sub}>Icos Capital · Expense Overview</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.greeting}>{profile?.full_name?.split(' ')[0] ?? 'Admin'}</Text>
+            <Text style={styles.sub}>Icos Capital · Admin</Text>
+          </View>
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Stats row */}
         <View style={styles.row}>
@@ -117,10 +135,13 @@ function getWeekStart() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  container: { padding: 16, paddingBottom: 32 },
+  container: { padding: 12, paddingBottom: 32 },
 
-  greeting: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.text, marginTop: 4 },
-  sub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: 16, marginTop: 2 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 2 },
+  greeting: { fontSize: FontSize.md, fontWeight: '800', color: Colors.text },
+  sub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 1 },
+  signOutBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border },
+  signOutText: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecondary },
 
   row: { flexDirection: 'row', gap: 10, marginBottom: 10 },
 
