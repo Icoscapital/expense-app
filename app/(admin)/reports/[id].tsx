@@ -226,7 +226,12 @@ export default function ReportDetailScreen() {
                 const cat = CATEGORIES[e.category];
                 const isPending = e.status === 'submitted';
                 return (
-                  <View key={e.id} style={styles.expenseRow}>
+                  <TouchableOpacity
+                    key={e.id}
+                    style={styles.expenseRow}
+                    onPress={() => router.push(`/(admin)/expenses/${e.id}`)}
+                    activeOpacity={0.75}
+                  >
                     <View style={[styles.expenseIcon, { backgroundColor: (cat?.color ?? '#6366F1') + '22' }]}>
                       <Text style={styles.expenseIconText}>{cat?.icon ?? '📋'}</Text>
                     </View>
@@ -257,7 +262,7 @@ export default function ReportDetailScreen() {
                         <StatusBadge status={e.status} size="sm" />
                       )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
