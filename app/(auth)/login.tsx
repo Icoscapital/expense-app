@@ -47,7 +47,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
-      redirectTo: 'http://localhost:8081/(auth)/reset-password',
+      redirectTo: 'https://expense-app-gray-two.vercel.app/(auth)/reset-password',
     });
     setLoading(false);
     if (error) {
