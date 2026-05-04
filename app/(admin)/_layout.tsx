@@ -56,6 +56,20 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
+        name="scan"
+        options={{
+          title: 'Scan',
+          tabBarIcon: ({ focused }) => <TabIcon icon="📷" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="my-expenses"
+        options={{
+          title: 'My Expenses',
+          tabBarIcon: ({ focused }) => <TabIcon icon="🧾" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="expenses"
         options={{ href: null }}
       />
