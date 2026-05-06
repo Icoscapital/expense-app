@@ -17,6 +17,7 @@ import { AmountInput } from '../../../components/AmountInput';
 import { CategoryPicker } from '../../../components/CategoryPicker';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { LoadingOverlay } from '../../../components/LoadingOverlay';
+import { ReceiptPreview } from '../../../components/ReceiptPreview';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '../../../constants/theme';
 import { ExpenseCategory } from '../../../types';
 
@@ -270,11 +271,9 @@ export default function ExpenseDetailScreen() {
           </View>
         )}
 
-        {/* Receipt Image */}
+        {/* Receipt */}
         {expense.receipt_url && (
-          <View style={styles.receiptContainer}>
-            <Image source={{ uri: expense.receipt_url }} style={styles.receiptImage} resizeMode="cover" />
-          </View>
+          <ReceiptPreview receiptUrl={expense.receipt_url} />
         )}
 
         {/* Amount */}

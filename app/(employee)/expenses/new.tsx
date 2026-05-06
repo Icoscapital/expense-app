@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform,
-  Alert, Image,
+  ScrollView, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../../hooks/useAuth';
 import { useExpenses } from '../../../hooks/useExpenses';
 import { AmountInput } from '../../../components/AmountInput';
 import { CategoryPicker } from '../../../components/CategoryPicker';
 import { LoadingOverlay } from '../../../components/LoadingOverlay';
+import { ReceiptAttacher } from '../../../components/ReceiptAttacher';
 import { Colors, FontSize, Spacing, BorderRadius } from '../../../constants/theme';
 import { ExpenseCategory, NewExpenseParams } from '../../../types';
-import { uploadReceiptBase64 } from '../../../lib/storage';
 
 // Convert YYYY-MM-DD → DD/MM/YYYY for display
 function toDisplayDate(iso: string): string {
@@ -51,32 +49,6 @@ export default function NewExpenseScreen() {
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  async function handleAttachFromLibrary() {
-    if (!profile?.workspace_id) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-      base64: true,
-    });
-    if (result.canceled || !result.assets[0]?.base64) return;
-    setLoading(true);
-    try {
-      const tempId = Date.now().toString();
-      const { publicUrl, storagePath } = await uploadReceiptBase64(
-        result.assets[0].base64,
-        profile.workspace_id,
-        profile.id,
-        tempId
-      );
-      setReceiptUrl(publicUrl);
-      setReceiptStoragePath(storagePath);
-    } catch (err: any) {
-      Alert.alert('Upload failed', err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function validate() {
     const e: Record<string, string> = {};
@@ -142,18 +114,14 @@ export default function NewExpenseScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          {/* Receipt Preview */}
-          {receiptUrl ? (
-            <View style={styles.receiptPreview}>
-              <Image source={{ uri: receiptUrl }} style={styles.receiptImage} resizeMode="cover" />
-              <TouchableOpacity style={styles.receiptChangeBtn} onPress={handleAttachFromLibrary}>
-                <Text style={styles.receiptLabel}>📎 Receipt attached · tap to change</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.attachBtn} onPress={handleAttachFromLibrary}>
-              <Text style={styles.attachBtnText}>📎 Attach receipt from photos</Text>
-            </TouchableOpacity>
+          {/* Receipt Attachment */}
+          {profile?.workspace_id && (
+            <ReceiptAttacher
+              workspaceId={profile.workspace_id}
+              userId={profile.id}
+              receiptUrl={receiptUrl}
+              onAttached={(url, path) => { setReceiptUrl(url); setReceiptStoragePath(path); }}
+            />
           )}
 
           {/* Amount */}

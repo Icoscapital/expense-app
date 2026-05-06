@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Image, KeyboardAvoidingView, Platform,
+  ScrollView, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -11,6 +11,7 @@ import { AmountInput } from '../../../components/AmountInput';
 import { CategoryPicker } from '../../../components/CategoryPicker';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { LoadingOverlay } from '../../../components/LoadingOverlay';
+import { ReceiptPreview } from '../../../components/ReceiptPreview';
 import { Colors, FontSize, Spacing, BorderRadius, Shadow } from '../../../constants/theme';
 import { ExpenseCategory } from '../../../types';
 
@@ -248,12 +249,10 @@ export default function AdminExpenseDetailScreen() {
 
           {/* Receipt */}
           {expense.receipt_url && (
-            <View style={styles.receiptContainer}>
-              <Image source={{ uri: expense.receipt_url }} style={styles.receiptImage} resizeMode="contain" />
-              <TouchableOpacity style={styles.receiptDownloadBtn} onPress={handleDownloadReceipt}>
-                <Text style={styles.receiptDownloadText}>⬇ Download Receipt</Text>
-              </TouchableOpacity>
-            </View>
+            <ReceiptPreview
+              receiptUrl={expense.receipt_url}
+              onDownload={handleDownloadReceipt}
+            />
           )}
 
           {/* Amount */}

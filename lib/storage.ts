@@ -59,6 +59,33 @@ export async function uploadReceiptBase64(
 }
 
 /**
+ * Upload a receipt from a base64 string with explicit mime type.
+ * Handles both images (jpeg/png) and PDFs.
+ */
+export async function uploadReceiptFile(
+  base64: string,
+  mimeType: string,
+  workspaceId: string,
+  userId: string,
+  tempId: string
+): Promise<{ storagePath: string; publicUrl: string }> {
+  const ext = mimeType === 'application/pdf' ? 'pdf'
+    : mimeType === 'image/png' ? 'png'
+    : 'jpg';
+  const storagePath = `${workspaceId}/${userId}/${tempId}.${ext}`;
+  const fileData = decode(base64);
+
+  const { error } = await supabase.storage
+    .from('receipts')
+    .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
+
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+
+  const { data } = supabase.storage.from('receipts').getPublicUrl(storagePath);
+  return { storagePath, publicUrl: data.publicUrl };
+}
+
+/**
  * Delete a receipt from storage (called when deleting a draft expense).
  */
 export async function deleteReceipt(storagePath: string): Promise<void> {
