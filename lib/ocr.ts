@@ -2,6 +2,68 @@ import { OcrResult } from '../types';
 
 const VISION_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_VISION_API_KEY!;
 const VISION_API_URL = `https://vision.googleapis.com/v1/images:annotate?key=${VISION_API_KEY}`;
+const VISION_PDF_URL = `https://vision.googleapis.com/v1/files:annotate?key=${VISION_API_KEY}`;
+
+/**
+ * Unified entry point — routes to the correct Vision API endpoint
+ * based on mime type (image vs PDF).
+ */
+export async function scanReceiptFile(base64: string, mimeType: string): Promise<OcrResult> {
+  if (mimeType === 'application/pdf') {
+    return scanReceiptPdf(base64);
+  }
+  return scanReceiptBase64(base64);
+}
+
+/**
+ * Scan a PDF receipt using the Vision files:annotate endpoint (up to 5 pages).
+ */
+async function scanReceiptPdf(base64Pdf: string): Promise<OcrResult> {
+  if (!VISION_API_KEY || VISION_API_KEY === 'YOUR_GOOGLE_VISION_API_KEY_HERE') {
+    throw new Error('Google Vision API key is not configured.');
+  }
+
+  const requestBody = {
+    requests: [{
+      inputConfig: {
+        content: base64Pdf,
+        mimeType: 'application/pdf',
+      },
+      features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+      pages: [1, 2], // first two pages is enough for a receipt
+    }],
+  };
+
+  const response = await fetch(VISION_PDF_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Vision API (PDF) error ${response.status}: ${body}`);
+  }
+
+  const json = await response.json();
+
+  if (json?.responses?.[0]?.error) {
+    const err = json.responses[0].error;
+    throw new Error(`Vision API: ${err.message ?? err.code}`);
+  }
+
+  // PDF response nests results differently — collect text from all pages
+  const pageResponses: any[] = json?.responses?.[0]?.responses ?? [];
+  const fullText = pageResponses
+    .map((p: any) => p?.fullTextAnnotation?.text ?? '')
+    .join('\n');
+
+  if (!fullText) {
+    return { amount: null, currency: 'EUR', merchantName: null, date: null, rawText: '' };
+  }
+
+  return parseReceiptText(fullText);
+}
 
 /**
  * Call Google Cloud Vision API with a base64-encoded JPEG.

@@ -10,6 +10,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadReceiptFile } from '../lib/storage';
+import { scanReceiptFile } from '../lib/ocr';
+import { OcrResult } from '../types';
 import { Colors, FontSize, Spacing, BorderRadius } from '../constants/theme';
 
 interface Props {
@@ -17,14 +19,17 @@ interface Props {
   userId: string;
   receiptUrl: string | null;
   onAttached: (url: string, storagePath: string) => void;
+  /** Called after OCR runs — use to pre-fill form fields */
+  onOcrResult?: (result: OcrResult) => void;
 }
 
 export function isPdf(url: string | null): boolean {
   return !!url && url.toLowerCase().includes('.pdf');
 }
 
-export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached }: Props) {
+export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached, onOcrResult }: Props) {
   const [uploading, setUploading] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<'idle' | 'scanning' | 'done' | 'failed'>('idle');
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -75,12 +80,27 @@ export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached }:
 
   async function upload(base64: string, mimeType: string) {
     setUploading(true);
+    setOcrStatus('idle');
     try {
       const tempId = Date.now().toString();
       const { publicUrl, storagePath } = await uploadReceiptFile(
         base64, mimeType, workspaceId, userId, tempId
       );
       onAttached(publicUrl, storagePath);
+
+      // Run OCR if callback provided
+      if (onOcrResult) {
+        setUploading(false);
+        setOcrStatus('scanning');
+        try {
+          const result = await scanReceiptFile(base64, mimeType);
+          onOcrResult(result);
+          setOcrStatus('done');
+        } catch {
+          setOcrStatus('failed');
+        }
+        return;
+      }
     } catch (err: any) {
       Alert.alert('Upload failed', err.message);
     } finally {
@@ -88,11 +108,12 @@ export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached }:
     }
   }
 
-  if (uploading) {
+  if (uploading || ocrStatus === 'scanning') {
+    const msg = uploading ? 'Uploading receipt…' : '🔍 Reading receipt with AI…';
     return (
       <View style={styles.uploadingBox}>
         <ActivityIndicator size="small" color={Colors.primary} />
-        <Text style={styles.uploadingText}>Uploading…</Text>
+        <Text style={styles.uploadingText}>{msg}</Text>
       </View>
     );
   }

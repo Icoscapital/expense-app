@@ -110,6 +110,17 @@ export default function AdminNewExpenseScreen() {
               userId={profile.id}
               receiptUrl={receiptUrl}
               onAttached={(url, path) => { setReceiptUrl(url); setReceiptStoragePath(path); }}
+              onOcrResult={(ocr) => {
+                if (ocr.amount) setAmount(String(ocr.amount));
+                if (ocr.merchantName) setMerchantName(ocr.merchantName);
+                if (ocr.currency) setCurrency(ocr.currency);
+                if (ocr.date) {
+                  const d = new Date(ocr.date);
+                  const today = new Date();
+                  const diff = (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+                  if (diff >= 0 && diff <= 30) setExpenseDate(toDisplayDate(ocr.date));
+                }
+              }}
             />
           )}
 
