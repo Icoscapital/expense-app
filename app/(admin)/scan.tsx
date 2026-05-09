@@ -21,6 +21,30 @@ if (Platform.OS !== 'web') {
 type ScanState = 'idle' | 'capturing' | 'uploading' | 'scanning' | 'done' | 'error';
 
 // ─── Web version ──────────────────────────────────────────────────────────────
+function pickFromBrowser(
+  accept: string,
+  capture?: 'environment' | 'user'
+): Promise<{ base64: string; mimeType: string } | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    if (capture) input.setAttribute('capture', capture);
+    input.onchange = (e: any) => {
+      const file: File | undefined = e.target.files?.[0];
+      if (!file) { resolve(null); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        resolve({ base64: dataUrl.split(',')[1], mimeType: file.type || 'image/jpeg' });
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  });
+}
+
 function WebScanScreen() {
   const router = useRouter();
   const { profile } = useAuth();
@@ -29,16 +53,12 @@ function WebScanScreen() {
 
   const isProcessing = ['uploading', 'scanning'].includes(scanState);
 
-  async function handlePickFile() {
+  async function handlePick(capture?: 'environment') {
     if (!profile?.workspace_id) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-      base64: true,
-    });
-    if (result.canceled || !result.assets[0]?.base64) return;
+    const picked = await pickFromBrowser('image/*', capture);
+    if (!picked) return;
 
-    const base64 = result.assets[0].base64;
+    const base64 = picked.base64;
     let uploadedUrl = '';
     let uploadedPath = '';
 
@@ -77,8 +97,9 @@ function WebScanScreen() {
         },
       });
     } catch (err: any) {
+      console.error('[scan/web admin] failed:', err);
       setScanState('error');
-      setStatusMessage('Could not read receipt — fill in details manually.');
+      setStatusMessage(err?.message ? `Error: ${err.message}` : 'Could not read receipt — fill in details manually.');
       setTimeout(() => router.push({
         pathname: '/(admin)/my-expenses/new',
         params: { receiptUrl: uploadedUrl, receiptStoragePath: uploadedPath },
@@ -87,7 +108,7 @@ function WebScanScreen() {
   }
 
   const stateMessages: Record<ScanState, string> = {
-    idle: 'Upload a receipt photo to auto-fill the form',
+    idle: 'Take a photo or upload a receipt to auto-fill the form',
     capturing: '📸 Capturing…',
     uploading: '☁️ Uploading receipt…',
     scanning: '🔍 Reading receipt with AI…',
@@ -109,8 +130,11 @@ function WebScanScreen() {
           </View>
         ) : (
           <>
-            <TouchableOpacity style={webStyles.uploadBtn} onPress={handlePickFile}>
-              <Text style={webStyles.uploadBtnText}>📂 Choose receipt photo</Text>
+            <TouchableOpacity style={webStyles.uploadBtn} onPress={() => handlePick('environment')}>
+              <Text style={webStyles.uploadBtnText}>📷 Take photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={webStyles.uploadBtnSecondary} onPress={() => handlePick()}>
+              <Text style={webStyles.uploadBtnSecondaryText}>🖼️ Upload from device</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={webStyles.manualBtn}
@@ -333,6 +357,12 @@ const webStyles = StyleSheet.create({
     paddingVertical: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md,
   },
   uploadBtnText: { color: Colors.white, fontSize: FontSize.md, fontWeight: '700' },
+  uploadBtnSecondary: {
+    borderWidth: 1.5, borderColor: Colors.primary,
+    paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md, marginBottom: Spacing.md,
+  },
+  uploadBtnSecondaryText: { color: Colors.primary, fontSize: FontSize.md, fontWeight: '700' },
   manualBtn: { paddingVertical: Spacing.sm },
   manualBtnText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' },
 });

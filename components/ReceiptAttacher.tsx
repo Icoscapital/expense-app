@@ -31,7 +31,61 @@ export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached, o
   const [uploading, setUploading] = useState(false);
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'scanning' | 'done' | 'failed'>('idle');
 
+  /**
+   * Web-only helper: open a hidden <input type="file"> and read the chosen file
+   * as base64. `capture` triggers the rear camera on mobile browsers; desktop
+   * browsers ignore it and show a normal file picker.
+   */
+  function pickFromBrowser(
+    accept: string,
+    capture?: 'environment' | 'user'
+  ): Promise<{ base64: string; mimeType: string } | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = accept;
+      if (capture) input.setAttribute('capture', capture);
+      input.onchange = (e: any) => {
+        const file: File | undefined = e.target.files?.[0];
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          const base64 = dataUrl.split(',')[1];
+          resolve({ base64, mimeType: file.type || 'application/octet-stream' });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    });
+  }
+
+  async function takePhoto() {
+    if (Platform.OS === 'web') {
+      const picked = await pickFromBrowser('image/*', 'environment');
+      if (!picked) return;
+      await upload(picked.base64, picked.mimeType.startsWith('image/') ? picked.mimeType : 'image/jpeg');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.9,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]?.base64) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    await upload(asset.base64!, mimeType);
+  }
+
   async function pickImage() {
+    if (Platform.OS === 'web') {
+      const picked = await pickFromBrowser('image/*');
+      if (!picked) return;
+      await upload(picked.base64, picked.mimeType.startsWith('image/') ? picked.mimeType : 'image/jpeg');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.9,
@@ -45,21 +99,9 @@ export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached, o
 
   async function pickPdf() {
     if (Platform.OS === 'web') {
-      // Web: use a hidden file input
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'application/pdf';
-      input.onchange = async (e: any) => {
-        const file: File = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const base64 = (ev.target?.result as string).split(',')[1];
-          await upload(base64, 'application/pdf');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+      const picked = await pickFromBrowser('application/pdf');
+      if (!picked) return;
+      await upload(picked.base64, 'application/pdf');
       return;
     }
 
@@ -102,7 +144,13 @@ export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached, o
         return;
       }
     } catch (err: any) {
-      Alert.alert('Upload failed', err.message);
+      console.error('[ReceiptAttacher] upload failed:', err);
+      if (Platform.OS === 'web') {
+        // RN Web's Alert.alert often silently no-ops; use window.alert directly.
+        window.alert(`Upload failed: ${err?.message ?? 'Unknown error'}`);
+      } else {
+        Alert.alert('Upload failed', err?.message ?? 'Unknown error');
+      }
     } finally {
       setUploading(false);
     }
@@ -148,8 +196,12 @@ export function ReceiptAttacher({ workspaceId, userId, receiptUrl, onAttached, o
 
   return (
     <View style={styles.attachRow}>
-      <TouchableOpacity style={styles.attachBtn} onPress={pickImage}>
+      <TouchableOpacity style={styles.attachBtn} onPress={takePhoto}>
         <Text style={styles.attachIcon}>📷</Text>
+        <Text style={styles.attachText}>Camera</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.attachBtn} onPress={pickImage}>
+        <Text style={styles.attachIcon}>🖼️</Text>
         <Text style={styles.attachText}>Photo</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.attachBtn} onPress={pickPdf}>
