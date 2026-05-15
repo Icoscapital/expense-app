@@ -192,18 +192,19 @@ function parseAmount(raw: string): number | null {
 }
 
 function extractCurrency(text: string): string {
-  const currencyPatterns: Record<string, RegExp> = {
-    EUR: /€|EUR/i,
-    GBP: /£|GBP/i,
-    CHF: /CHF|Fr\./i,
-    AED: /AED|د\.إ/i,
-    CAD: /CAD|C\$/i,
-    AUD: /AUD|A\$/i,
-    USD: /\$|USD/i,
-  };
+  // Source of truth lives in constants/currencies.ts — adding a new currency
+  // there automatically enables OCR detection for it here.
+  // We deliberately check ISO codes first (most reliable), then symbol-only
+  // patterns, because "$" alone is ambiguous between USD/AUD/CAD/SGD/HKD/etc.
+  const { CURRENCIES } = require('../constants/currencies') as typeof import('../constants/currencies');
 
-  for (const [code, pattern] of Object.entries(currencyPatterns)) {
-    if (pattern.test(text)) return code;
+  // Pass 1: explicit ISO code match (e.g. "SGD 12.50", "USD 10")
+  for (const c of CURRENCIES) {
+    if (new RegExp(`\\b${c.code}\\b`, 'i').test(text)) return c.code;
+  }
+  // Pass 2: symbol pattern match (less reliable for $ — falls through in order)
+  for (const c of CURRENCIES) {
+    if (c.ocrPattern.test(text)) return c.code;
   }
   return 'EUR'; // default to EUR for Icos Capital
 }
