@@ -6,13 +6,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { supabase } from '../../lib/supabase';
 import { Colors, FontSize, Spacing, BorderRadius } from '../../constants/theme';
 import { LoadingOverlay } from '../../components/LoadingOverlay';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const ALLOWED_DOMAIN = '@icoscapital.com';
 
@@ -60,35 +56,6 @@ export default function LoginScreen() {
     }
   }
 
-  async function handleMicrosoftLogin() {
-    setLoading(true);
-    try {
-      const redirectTo = Linking.createURL('/auth-callback');
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'azure',
-        options: {
-          scopes: 'email profile openid',
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
-      });
-      if (error) throw error;
-      if (!data.url) throw new Error('No OAuth URL returned');
-
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-
-      if (result.type === 'success' && result.url) {
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.exchangeCodeForSession(result.url);
-        if (sessionError) throw sessionError;
-      }
-    } catch (err: any) {
-      Alert.alert('Microsoft login failed', err.message ?? 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <SafeAreaView style={styles.safe}>
       {loading && <LoadingOverlay message="Signing in…" />}
@@ -113,22 +80,6 @@ export default function LoginScreen() {
 
           <View style={styles.card}>
             <Text style={styles.title}>Welcome back</Text>
-
-            <TouchableOpacity style={styles.microsoftBtn} onPress={handleMicrosoftLogin} activeOpacity={0.85}>
-              <View style={styles.msLogo}>
-                <View style={[styles.msSquare, { backgroundColor: '#F25022' }]} />
-                <View style={[styles.msSquare, { backgroundColor: '#7FBA00' }]} />
-                <View style={[styles.msSquare, { backgroundColor: '#00A4EF' }]} />
-                <View style={[styles.msSquare, { backgroundColor: '#FFB900' }]} />
-              </View>
-              <Text style={styles.microsoftBtnText}>Sign in with Microsoft</Text>
-            </TouchableOpacity>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or email</Text>
-              <View style={styles.dividerLine} />
-            </View>
 
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -193,19 +144,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   title: { fontSize: FontSize.base, fontWeight: '700', color: Colors.text, marginBottom: 8 },
-
-  microsoftBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: BorderRadius.md, paddingVertical: 8, paddingHorizontal: 12,
-  },
-  msLogo: { width: 16, height: 16, flexDirection: 'row', flexWrap: 'wrap', marginRight: 8 },
-  msSquare: { width: 7, height: 7, margin: 0.5 },
-  microsoftBtnText: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.text },
-
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-  dividerText: { fontSize: FontSize.xs, color: Colors.textMuted, marginHorizontal: 8 },
 
   label: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.gray700, marginBottom: 3, marginTop: 6 },
   input: {
